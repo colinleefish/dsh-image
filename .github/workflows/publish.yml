@@ -90,7 +90,7 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Copy manifest to Aliyun ACR
+      - name: Push same tag to Aliyun ACR
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
@@ -98,9 +98,10 @@ jobs:
             echo "refusing to overwrite existing ACR tag: ${ACR_IMAGE}:${VERSION}" >&2
             exit 1
           fi
-          docker buildx imagetools create \
-            --tag "${ACR_IMAGE}:${VERSION}" \
-            "${DOCKERHUB_IMAGE}:${VERSION}"
+          # Prefer pull+push over imagetools create; cross-registry create can hang on personal ACR.
+          docker pull "${DOCKERHUB_IMAGE}:${VERSION}"
+          docker tag "${DOCKERHUB_IMAGE}:${VERSION}" "${ACR_IMAGE}:${VERSION}"
+          docker push "${ACR_IMAGE}:${VERSION}"
 
       - name: Inspect published manifests
         env:
