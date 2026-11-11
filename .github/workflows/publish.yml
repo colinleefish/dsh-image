@@ -53,16 +53,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Refuse overwrite if tag exists on Docker Hub
+      - name: Check Docker Hub tag
+        id: hub
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           if docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:${VERSION}" >/dev/null 2>&1; then
-            echo "refusing to overwrite existing Docker Hub tag: ${DOCKERHUB_IMAGE}:${VERSION}" >&2
-            exit 1
+            echo "exists=true" >>"${GITHUB_OUTPUT}"
+            echo "Docker Hub tag already present; skip rebuild"
+          else
+            echo "exists=false" >>"${GITHUB_OUTPUT}"
           fi
 
       - name: Build and push Docker Hub
+        if: steps.hub.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
