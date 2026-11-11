@@ -9,9 +9,9 @@ Pinned like [runzhliu/deepseek-harness-docker](https://github.com/runzhliu/deeps
 | Variable | Meaning | Current |
 | --- | --- | --- |
 | `DSH_VERSION` | npm `@deepseek-ai/dsh` | `0.2.2-rc.1` |
-| `DSH_IMAGE_VERSION` / `IMAGE_VERSION` | immutable image revision | `0.2.2-rc.1-r2` |
+| `DSH_IMAGE_VERSION` / `IMAGE_VERSION` | immutable image revision | `0.2.2-rc.1-r3` |
 
-Bump `IMAGE_VERSION` (`-r3`, …) for container-only changes. Bump `DSH_VERSION` only when packaging a new upstream npm release, and update every pin together (`make version-check`).
+Bump `IMAGE_VERSION` (`-r4`, …) for container-only changes. Bump `DSH_VERSION` only when packaging a new upstream npm release, and update every pin together (`make version-check`).
 
 Published tags (same digest family from CI):
 
@@ -28,15 +28,17 @@ Published tags (same digest family from CI):
 | --- | --- |
 | `DOCKERHUB_USERNAME` | Docker Hub user (e.g. `colinleefish`) |
 | `DOCKERHUB_TOKEN` | Docker Hub access token |
-| `ACR_USERNAME` | Aliyun ACR login user |
-| `ACR_PASSWORD` | ACR registry password / token |
+| `ACR_USERNAME` | **旧版个人版**登录名 = 阿里云账号全名（常见为 `colinleefish@aliyun.com`，不是命名空间 `colinleefish`，也不是 AccessKey） |
+| `ACR_PASSWORD` | 容器镜像服务 → 访问凭证 里设置的**镜像仓库独立密码**（不是阿里云登录密码，也不是 AK Secret） |
 
-Workflow: `.github/workflows/publish.yml` — manual dispatch or tag `image-v0.2.2-rc.1-r2`.
+Registry：`registry.cn-beijing.aliyuncs.com`（个人版北京）。不要填企业版 `*.cr.aliyuncs.com` / InstanceId。
+
+Workflow: `.github/workflows/publish.yml` — manual dispatch or tag `image-v0.2.2-rc.1-r3`.
 
 ```bash
 gh secret set DOCKERHUB_USERNAME -R colinleefish/dsh-image
 gh secret set DOCKERHUB_TOKEN -R colinleefish/dsh-image
-gh secret set ACR_USERNAME -R colinleefish/dsh-image
+gh secret set ACR_USERNAME -R colinleefish/dsh-image -b 'colinleefish@aliyun.com'
 gh secret set ACR_PASSWORD -R colinleefish/dsh-image
 ```
 
@@ -44,7 +46,7 @@ gh secret set ACR_PASSWORD -R colinleefish/dsh-image
 
 ```bash
 cp .env.example .env
-# pins: DSH_VERSION=0.2.2-rc.1  DSH_IMAGE_VERSION=0.2.2-rc.1-r2
+# pins: DSH_VERSION=0.2.2-rc.1  DSH_IMAGE_VERSION=0.2.2-rc.1-r3
 make version-check
 make build
 make smoke
