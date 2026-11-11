@@ -11,7 +11,7 @@ permissions:
 
 env:
   DSH_VERSION: 0.2.2-rc.1
-  IMAGE_VERSION: 0.2.2-rc.1-r3
+  IMAGE_VERSION: 0.2.2-rc.1-r4
   PNPM_VERSION: 10.15.1
   UV_VERSION: 0.9.7
   DOCKERHUB_IMAGE: docker.io/colinleefish/dsh-image
@@ -78,6 +78,9 @@ jobs:
         with:
           context: .
           push: true
+          # Personal ACR rejects OCI attestations (vnd.oci.empty.v1+json).
+          provenance: false
+          sbom: false
           platforms: ${{ env.PLATFORMS }}
           tags: |
             ${{ env.DOCKERHUB_IMAGE }}:${{ steps.meta.outputs.version }}

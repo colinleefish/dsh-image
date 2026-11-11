@@ -3,7 +3,7 @@ IMAGE ?= registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
 DOCKERHUB_IMAGE ?= docker.io/colinleefish/dsh-image
 ACR_IMAGE ?= registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
 DSH_VERSION ?= 0.2.2-rc.1
-IMAGE_VERSION ?= $(DSH_VERSION)-r3
+IMAGE_VERSION ?= $(DSH_VERSION)-r4
 NODE_IMAGE ?= docker.io/library/node:24-trixie
 PNPM_VERSION ?= 10.15.1
 UV_VERSION ?= 0.9.7
@@ -42,6 +42,7 @@ push: version-check
 		echo "refusing to overwrite existing image tag: $(DOCKERHUB_IMAGE):$(IMAGE_VERSION)" >&2; exit 1; \
 	fi
 	docker buildx build --platform $(PLATFORMS) \
+		--provenance=false --sbom=false \
 		--build-arg DSH_VERSION=$(DSH_VERSION) \
 		--build-arg IMAGE_VERSION=$(IMAGE_VERSION) \
 		--build-arg IMAGE_REVISION=$$(git describe --always --dirty 2>/dev/null || echo unknown) \
