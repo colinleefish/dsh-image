@@ -2,7 +2,7 @@ name: dsh-image
 
 services:
   dsh:
-    image: ${DSH_IMAGE_REPOSITORY:-ghcr.io/colinleefish/dsh-image}:${DSH_IMAGE_VERSION:-0.2.2-rc.1-r1}
+    image: ${DSH_IMAGE_REPOSITORY:-registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image}:${DSH_IMAGE_VERSION:-0.2.2-rc.1-r2}
     container_name: dsh
     restart: unless-stopped
     env_file:

@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Lean DeepSeek Harness image: Web UI + agent CLI tools, no Chromium/noVNC.
+# Build/runtime package indexes default to Aliyun / npmmirror (China-first).
 
 ARG NODE_IMAGE=docker.io/library/node:24-trixie
 FROM ${NODE_IMAGE}
@@ -7,9 +8,15 @@ FROM ${NODE_IMAGE}
 ARG DSH_VERSION=0.2.2-rc.1
 ARG PNPM_VERSION=10.15.1
 ARG UV_VERSION=0.9.7
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ARG TARGETARCH
 
-RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+# Debian 13 (trixie) DEB822 sources → Aliyun
+RUN sed -i \
+      -e 's|https\?://deb.debian.org|https://mirrors.aliyun.com|g' \
+      -e 's|https\?://security.debian.org|https://mirrors.aliyun.com/debian-security|g' \
+      /etc/apt/sources.list.d/debian.sources \
  && apt-get update \
  && apt-get install --yes --no-install-recommends \
     ca-certificates \
@@ -22,6 +29,7 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.l
     postgresql-client \
     procps \
     python3 \
+    python3-pip \
     ripgrep \
     rsync \
     tini \
@@ -31,23 +39,16 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.l
     zip \
  && rm -rf /var/lib/apt/lists/*
 
-# uv (static binary) for Python tooling inside the agent workspace.
-RUN set -eux; \
-  case "${TARGETARCH}" in \
-    amd64) uv_arch=x86_64 ;; \
-    arm64) uv_arch=aarch64 ;; \
-    *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
-  esac; \
-  curl --fail --location --retry 3 \
-    -o /tmp/uv.tar.gz \
-    "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${uv_arch}-unknown-linux-gnu.tar.gz"; \
-  tar -xzf /tmp/uv.tar.gz -C /tmp; \
-  install -m 0755 "/tmp/uv-${uv_arch}-unknown-linux-gnu/uv" /usr/local/bin/uv; \
-  install -m 0755 "/tmp/uv-${uv_arch}-unknown-linux-gnu/uvx" /usr/local/bin/uvx; \
-  rm -rf /tmp/uv.tar.gz "/tmp/uv-${uv_arch}-unknown-linux-gnu"; \
-  uv --version
+# uv from Aliyun PyPI (avoids GitHub release downloads inside China).
+RUN PIP_INDEX_URL="${PIP_INDEX_URL}" \
+    PIP_TRUSTED_HOST=mirrors.aliyun.com \
+    pip3 install --break-system-packages --no-cache-dir "uv==${UV_VERSION}" \
+ && uv --version
+
+ENV NPM_CONFIG_REGISTRY=${NPM_REGISTRY}
 
 RUN npm install --global --omit=dev --no-audit --no-fund \
+      --registry="${NPM_REGISTRY}" \
       --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty,@google/genai,protobufjs \
       "@deepseek-ai/dsh@${DSH_VERSION}" \
       "pnpm@${PNPM_VERSION}" \
@@ -62,7 +63,11 @@ RUN chmod 0755 /usr/local/bin/dsh-image-entrypoint
 ENV DSH_HOME=/home/node/.dsh \
     DSH_TELEMETRY_DISABLED=1 \
     HOME=/workspace \
-    NPM_CONFIG_CACHE=/home/node/.dsh/npm-cache
+    NPM_CONFIG_CACHE=/home/node/.dsh/npm-cache \
+    NPM_CONFIG_REGISTRY=${NPM_REGISTRY} \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=mirrors.aliyun.com \
+    UV_INDEX_URL=${PIP_INDEX_URL}
 
 RUN mkdir -p "${DSH_HOME}" /workspace \
  && chown -R node:node "${DSH_HOME}" /workspace
@@ -72,7 +77,7 @@ WORKDIR /workspace
 
 EXPOSE 3080
 
-ARG IMAGE_VERSION=0.2.2-rc.1-r1
+ARG IMAGE_VERSION=0.2.2-rc.1-r2
 ARG IMAGE_REVISION=unknown
 LABEL org.opencontainers.image.title="colinleefish/dsh-image" \
       org.opencontainers.image.description="Lean DeepSeek Harness image without Chromium" \
