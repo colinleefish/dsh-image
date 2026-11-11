@@ -167,17 +167,26 @@ jobs:
           cat sha256sums.txt
           cat release-notes.md
 
-      - name: Ensure git tag
+      - name: Ensure git tags
         env:
           VERSION: ${{ steps.meta.outputs.version }}
           GIT_TAG: ${{ steps.meta.outputs.git_tag }}
+          DSH_VERSION: ${{ env.DSH_VERSION }}
         run: |
-          if git rev-parse "refs/tags/${GIT_TAG}" >/dev/null 2>&1; then
-            echo "tag ${GIT_TAG} already exists"
-          else
-            git tag -a "${GIT_TAG}" -m "dsh-image ${VERSION}"
-            git push origin "refs/tags/${GIT_TAG}"
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          ensure_tag() {
+            local tag="$1"
+            local msg="$2"
+            if git rev-parse "refs/tags/${tag}" >/dev/null 2>&1; then
+              echo "tag ${tag} already exists"
+            else
+              git tag -a "${tag}" -m "${msg}"
+              git push origin "refs/tags/${tag}"
+            fi
+          }
+          ensure_tag "${GIT_TAG}" "dsh-image ${VERSION}"
+          ensure_tag "dsh-v${DSH_VERSION}" "upstream @deepseek-ai/dsh ${DSH_VERSION} (image ${VERSION})"
 
       - name: Create or update GitHub Release
         env:
