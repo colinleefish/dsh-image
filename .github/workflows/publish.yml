@@ -7,7 +7,7 @@ on:
       - "image-v*"
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   DSH_VERSION: 0.2.2-rc.1
@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Version consistency
         run: make version-check
@@ -40,6 +42,7 @@ jobs:
             exit 1
           fi
           echo "version=${version}" >>"${GITHUB_OUTPUT}"
+          echo "git_tag=image-v${version}" >>"${GITHUB_OUTPUT}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -60,20 +63,33 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Refuse overwrite of existing tags
+      - name: Check existing image tags
+        id: images
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
+          hub=false
+          acr=false
           if docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:${VERSION}" >/dev/null 2>&1; then
-            echo "refusing to overwrite existing Docker Hub tag: ${DOCKERHUB_IMAGE}:${VERSION}" >&2
-            exit 1
+            hub=true
           fi
           if docker buildx imagetools inspect "${ACR_IMAGE}:${VERSION}" >/dev/null 2>&1; then
-            echo "refusing to overwrite existing ACR tag: ${ACR_IMAGE}:${VERSION}" >&2
+            acr=true
+          fi
+          echo "hub_exists=${hub}" >>"${GITHUB_OUTPUT}"
+          echo "acr_exists=${acr}" >>"${GITHUB_OUTPUT}"
+          if [[ "${hub}" == true && "${acr}" == true ]]; then
+            echo "build=false" >>"${GITHUB_OUTPUT}"
+            echo "Both registry tags already exist; skip rebuild"
+          elif [[ "${hub}" == true || "${acr}" == true ]]; then
+            echo "Only one registry has ${VERSION}; refusing partial republish" >&2
             exit 1
+          else
+            echo "build=true" >>"${GITHUB_OUTPUT}"
           fi
 
       - name: Build and push both registries
+        if: steps.images.outputs.build == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -95,9 +111,88 @@ jobs:
             NPM_REGISTRY=https://registry.npmmirror.com
             PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
-      - name: Inspect published manifests
+      - name: Collect digests and write release notes
+        id: release_files
         env:
           VERSION: ${{ steps.meta.outputs.version }}
+          DSH_VERSION: ${{ env.DSH_VERSION }}
+          DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
+          ACR_IMAGE: ${{ env.ACR_IMAGE }}
         run: |
-          docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:${VERSION}"
-          docker buildx imagetools inspect "${ACR_IMAGE}:${VERSION}"
+          set -euo pipefail
+          digest_of() {
+            docker buildx imagetools inspect "$1" | awk '/^Digest:/{print $2; exit}'
+          }
+          hub_digest="$(digest_of "${DOCKERHUB_IMAGE}:${VERSION}")"
+          acr_digest="$(digest_of "${ACR_IMAGE}:${VERSION}")"
+          if [[ -z "${hub_digest}" || -z "${acr_digest}" ]]; then
+            echo "missing digest(s): hub=${hub_digest:-empty} acr=${acr_digest:-empty}" >&2
+            exit 1
+          fi
+          {
+            echo "${hub_digest}  ${DOCKERHUB_IMAGE}:${VERSION}"
+            echo "${acr_digest}  ${ACR_IMAGE}:${VERSION}"
+          } >sha256sums.txt
+
+          cat >release-notes.md <<EOF
+          ## dsh-image ${VERSION}
+
+          | Pin | Value |
+          | --- | --- |
+          | \`DSH_VERSION\` | \`${DSH_VERSION}\` (\`@deepseek-ai/dsh\`) |
+          | \`IMAGE_VERSION\` | \`${VERSION}\` |
+
+          ### Pull
+
+          \`\`\`bash
+          # Aliyun ACR (Beijing, preferred in China)
+          docker pull ${ACR_IMAGE}:${VERSION}
+
+          # Docker Hub
+          docker pull ${DOCKERHUB_IMAGE}:${VERSION}
+          \`\`\`
+
+          ### Digests
+
+          See attached \`sha256sums.txt\`.
+
+          | Registry | Digest |
+          | --- | --- |
+          | Docker Hub | \`${hub_digest}\` |
+          | Aliyun ACR | \`${acr_digest}\` |
+          EOF
+          sed -i 's/^          //' release-notes.md
+          echo "hub_digest=${hub_digest}" >>"${GITHUB_OUTPUT}"
+          echo "acr_digest=${acr_digest}" >>"${GITHUB_OUTPUT}"
+          cat sha256sums.txt
+          cat release-notes.md
+
+      - name: Ensure git tag
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          GIT_TAG: ${{ steps.meta.outputs.git_tag }}
+        run: |
+          if git rev-parse "refs/tags/${GIT_TAG}" >/dev/null 2>&1; then
+            echo "tag ${GIT_TAG} already exists"
+          else
+            git tag -a "${GIT_TAG}" -m "dsh-image ${VERSION}"
+            git push origin "refs/tags/${GIT_TAG}"
+          fi
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          GIT_TAG: ${{ steps.meta.outputs.git_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "${GIT_TAG}" >/dev/null 2>&1; then
+            gh release upload "${GIT_TAG}" sha256sums.txt --clobber
+            gh release edit "${GIT_TAG}" --notes-file release-notes.md
+          else
+            gh release create "${GIT_TAG}" \
+              --title "dsh-image ${VERSION}" \
+              --notes-file release-notes.md \
+              sha256sums.txt
+          fi
+          gh release view "${GIT_TAG}" --json url,tagName,assets -q .

@@ -35,6 +35,8 @@ Registry：`registry.cn-beijing.aliyuncs.com`（个人版北京）。不要填�
 
 Workflow: `.github/workflows/publish.yml` — manual dispatch or tag `image-v0.2.2-rc.1-r4`.
 
+After a successful publish it creates GitHub Release `image-v<IMAGE_VERSION>` with pull commands and attaches `sha256sums.txt` (manifest digests for Hub + ACR). Re-running against an already-pushed tag skips rebuild and only refreshes the Release.
+
 ```bash
 gh secret set DOCKERHUB_USERNAME -R colinleefish/dsh-image
 gh secret set DOCKERHUB_TOKEN -R colinleefish/dsh-image
