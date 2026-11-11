@@ -63,9 +63,13 @@ RUN npm install --global --omit=dev --no-audit --no-fund \
  && npm cache clean --force
 
 COPY scripts/dsh-web-relay.cjs /opt/dsh-image/dsh-web-relay.cjs
-COPY scripts/dsh /usr/local/bin/dsh
+COPY scripts/dsh /opt/dsh-image/dsh
 COPY scripts/entrypoint.sh /usr/local/bin/dsh-image-entrypoint
-RUN chmod 0755 /usr/local/bin/dsh /usr/local/bin/dsh-image-entrypoint \
+# npm's global `dsh` is a symlink into package lib/; copying over it would
+# clobber bin.js. Replace the link with our noexec-safe wrapper instead.
+RUN rm -f /usr/local/bin/dsh \
+ && install -m 0755 /opt/dsh-image/dsh /usr/local/bin/dsh \
+ && chmod 0755 /usr/local/bin/dsh-image-entrypoint \
  && dsh --version | grep -Fx "${DSH_VERSION}"
 
 ENV DSH_HOME=/home/node/.dsh \
