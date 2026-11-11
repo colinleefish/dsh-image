@@ -1,0 +1,49 @@
+name: dsh-image
+
+services:
+  dsh:
+    image: ${DSH_IMAGE_REPOSITORY:-ghcr.io/colinleefish/dsh-image}:${DSH_IMAGE_VERSION:-0.2.2-rc.1-r1}
+    container_name: dsh
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "127.0.0.1:${DSH_PORT:-3080}:3080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "rmb.colinleefish.com:0.0.0.0"
+    environment:
+      TZ: Asia/Shanghai
+      HOME: /workspace
+      DSH_TELEMETRY_DISABLED: "1"
+      DSH_WEB_EXTRA_ARGS: ${DSH_WEB_EXTRA_ARGS:-}
+    volumes:
+      - ${DSH_HOME_HOST:-./data/dot-dsh}:/home/node/.dsh
+      - ${DSH_SSH_HOST:-./data/dot-ssh}:/home/node/.ssh
+      - ${DSH_WORKSPACE:-./workspace}:/workspace
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m
+    shm_size: "64mb"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 1536m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3080/').then((r) => process.exit([200,401,403].includes(r.status) ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5

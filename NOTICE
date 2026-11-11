@@ -1,0 +1,4 @@
+This repository packages the official npm distribution `@deepseek-ai/dsh`.
+
+`scripts/dsh-web-relay.cjs` is adapted from runzhliu/deepseek-harness-docker
+(MIT License): https://github.com/runzhliu/deepseek-harness-docker
