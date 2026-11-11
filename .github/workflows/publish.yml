@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
   DSH_VERSION: 0.2.2-rc.1
@@ -54,13 +53,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Login Aliyun ACR (beijing)
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cn-beijing.aliyuncs.com
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-
       - name: Refuse overwrite if tag exists on Docker Hub
         env:
           VERSION: ${{ steps.meta.outputs.version }}
@@ -70,15 +62,13 @@ jobs:
             exit 1
           fi
 
-      - name: Build and push
+      - name: Build and push Docker Hub
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: ${{ env.PLATFORMS }}
-          tags: |
-            ${{ env.DOCKERHUB_IMAGE }}:${{ steps.meta.outputs.version }}
-            ${{ env.ACR_IMAGE }}:${{ steps.meta.outputs.version }}
+          tags: ${{ env.DOCKERHUB_IMAGE }}:${{ steps.meta.outputs.version }}
           build-args: |
             DSH_VERSION=${{ env.DSH_VERSION }}
             IMAGE_VERSION=${{ steps.meta.outputs.version }}
@@ -88,6 +78,25 @@ jobs:
             NODE_IMAGE=docker.io/library/node:24-trixie
             NPM_REGISTRY=https://registry.npmmirror.com
             PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
+      - name: Login Aliyun ACR (beijing personal)
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-beijing.aliyuncs.com
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Copy manifest to Aliyun ACR
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if docker buildx imagetools inspect "${ACR_IMAGE}:${VERSION}" >/dev/null 2>&1; then
+            echo "refusing to overwrite existing ACR tag: ${ACR_IMAGE}:${VERSION}" >&2
+            exit 1
+          fi
+          docker buildx imagetools create \
+            --tag "${ACR_IMAGE}:${VERSION}" \
+            "${DOCKERHUB_IMAGE}:${VERSION}"
 
       - name: Inspect published manifests
         env:
