@@ -9,9 +9,9 @@ Pinned like [runzhliu/deepseek-harness-docker](https://github.com/runzhliu/deeps
 | Variable | Meaning | Current |
 | --- | --- | --- |
 | `DSH_VERSION` | npm `@deepseek-ai/dsh` | `0.2.2-rc.1` |
-| `DSH_IMAGE_VERSION` / `IMAGE_VERSION` | immutable image revision | `0.2.2-rc.1-r4` |
+| `DSH_IMAGE_VERSION` / `IMAGE_VERSION` | immutable image revision | `0.2.2-rc.1-r5` |
 
-Bump `IMAGE_VERSION` (`-r5`, …) for container-only changes. Bump `DSH_VERSION` only when packaging a new upstream npm release, and update every pin together (`make version-check`).
+Bump `IMAGE_VERSION` (`-r6`, …) for container-only changes. Bump `DSH_VERSION` only when packaging a new upstream npm release, and update every pin together (`make version-check`).
 
 Published tags (same digest family from CI):
 
@@ -33,7 +33,7 @@ Published tags (same digest family from CI):
 
 Registry：`registry.cn-beijing.aliyuncs.com`（个人版北京）。不要填企业版 `*.cr.aliyuncs.com` / InstanceId。
 
-Workflow: `.github/workflows/publish.yml` — manual dispatch or tag `image-v0.2.2-rc.1-r4`.
+Workflow: `.github/workflows/publish.yml` — manual dispatch or tag `image-v0.2.2-rc.1-r5`.
 
 After a successful publish it creates GitHub Release `image-v<IMAGE_VERSION>` with pull commands and attaches `sha256sums.txt` (manifest digests for Hub + ACR). Re-running against an already-pushed tag skips rebuild and only refreshes the Release.
 
@@ -48,7 +48,7 @@ gh secret set ACR_PASSWORD -R colinleefish/dsh-image
 
 ```bash
 cp .env.example .env
-# pins: DSH_VERSION=0.2.2-rc.1  DSH_IMAGE_VERSION=0.2.2-rc.1-r4
+# pins: DSH_VERSION=0.2.2-rc.1  DSH_IMAGE_VERSION=0.2.2-rc.1-r5
 make version-check
 make build
 make smoke

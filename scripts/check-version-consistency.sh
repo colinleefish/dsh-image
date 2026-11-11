@@ -34,7 +34,7 @@ require_literal compose.yaml 'DSH_IMAGE_REPOSITORY:-registry.cn-beijing.aliyuncs
 require_literal README.md "DSH_VERSION=${dsh_version}"
 require_literal README.md "${image_version}"
 require_literal Makefile "DSH_VERSION ?= ${dsh_version}"
-require_literal Makefile "IMAGE_VERSION ?= \$(DSH_VERSION)-r4"
+require_literal Makefile "IMAGE_VERSION ?= \$(DSH_VERSION)-r5"
 require_literal Makefile "PNPM_VERSION ?= ${pnpm_version}"
 require_literal Makefile "UV_VERSION ?= ${uv_version}"
 require_literal .github/workflows/publish.yml "DSH_VERSION: ${dsh_version}"
@@ -43,6 +43,12 @@ require_literal .github/workflows/publish.yml "PNPM_VERSION: ${pnpm_version}"
 require_literal .github/workflows/publish.yml "UV_VERSION: ${uv_version}"
 require_literal .github/workflows/publish.yml "docker.io/colinleefish/dsh-image"
 require_literal .github/workflows/publish.yml "registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image"
+
+require_literal Dockerfile "ARG NPM_DSH_REGISTRY=https://registry.npmjs.org"
+
+require_literal Dockerfile "NARB_DISABLE_NATIVE_CACHE=1"
+
+require_literal Dockerfile "COPY scripts/dsh /usr/local/bin/dsh"
 
 printf 'version consistency ok: dsh=%s image=%s pnpm=%s uv=%s\n' \
   "${dsh_version}" "${image_version}" "${pnpm_version}" "${uv_version}"

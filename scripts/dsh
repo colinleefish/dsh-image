@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+# DSH materializes native addons in a runtime cache before loading them.
+# Hardened compose mounts /tmp noexec; load packaged addons from /usr/local.
+if [ -z "${NARB_DISABLE_NATIVE_CACHE+x}" ] && [ -z "${NARB_NATIVE_CACHE_DIR+x}" ]; then
+  export NARB_DISABLE_NATIVE_CACHE=1
+fi
+
+exec node --expose-internals \
+  /usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js \
+  "$@"
