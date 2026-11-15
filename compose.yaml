@@ -14,12 +14,11 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       TZ: Asia/Shanghai
-      HOME: /workspace
       DSH_TELEMETRY_DISABLED: "1"
       DSH_WEB_EXTRA_ARGS: ${DSH_WEB_EXTRA_ARGS:-}
     volumes:
-      - ${DSH_HOME_HOST:-./data/dot-dsh}:/home/node/.dsh
-      - ${DSH_WORKSPACE:-./data/workspace}:/workspace
+      - ./data/dot-dsh:/home/node/.dsh
+      - ./data/workspace:/workspace
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=256m
