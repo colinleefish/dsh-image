@@ -31,7 +31,7 @@ require_literal .env.example "UV_VERSION=${uv_version}"
 require_literal .env.example "registry.cn-beijing.aliyuncs.com/colinleefish"
 require_literal compose.yaml "DSH_IMAGE_VERSION:-${image_version}"
 require_literal compose.yaml 'DSH_IMAGE_REPOSITORY:-registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image'
-require_literal README.md "registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image"
+require_literal README.md "github.com/colinleefish/dsh-image/releases"
 require_literal README.md ".env.example"
 require_literal Makefile "DSH_VERSION ?= ${dsh_version}"
 require_literal Makefile "IMAGE_VERSION ?= \$(DSH_VERSION)"
