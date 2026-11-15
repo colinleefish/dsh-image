@@ -3,7 +3,7 @@ IMAGE ?= registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
 DOCKERHUB_IMAGE ?= docker.io/colinleefish/dsh-image
 ACR_IMAGE ?= registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
 DSH_VERSION ?= 0.2.2-rc.3
-IMAGE_VERSION ?= $(DSH_VERSION)-r1
+IMAGE_VERSION ?= $(DSH_VERSION)
 NODE_IMAGE ?= docker.io/library/node:24-trixie
 PNPM_VERSION ?= 10.15.1
 UV_VERSION ?= 0.9.7
@@ -15,7 +15,7 @@ PLATFORMS ?= linux/amd64
 
 help:
 	@echo "build          Build the local platform image"
-	@echo "push           Build and push ACR + Docker Hub (refuses overwrite)"
+	@echo "push           Build and push ACR + Docker Hub (may overwrite same tag)"
 	@echo "pull           Pull $(IMAGE):$(IMAGE_VERSION)"
 	@echo "version-check  Verify pinned versions across files"
 	@echo "verify         version-check"
@@ -35,12 +35,6 @@ build:
 		--tag $(IMAGE):$(IMAGE_VERSION) .
 
 push: version-check
-	@if docker buildx imagetools inspect $(ACR_IMAGE):$(IMAGE_VERSION) >/dev/null 2>&1; then \
-		echo "refusing to overwrite existing image tag: $(ACR_IMAGE):$(IMAGE_VERSION)" >&2; exit 1; \
-	fi
-	@if docker buildx imagetools inspect $(DOCKERHUB_IMAGE):$(IMAGE_VERSION) >/dev/null 2>&1; then \
-		echo "refusing to overwrite existing image tag: $(DOCKERHUB_IMAGE):$(IMAGE_VERSION)" >&2; exit 1; \
-	fi
 	docker buildx build --platform $(PLATFORMS) \
 		--provenance=false --sbom=false \
 		--build-arg DSH_VERSION=$(DSH_VERSION) \
@@ -60,7 +54,7 @@ pull:
 
 version-check:
 	./scripts/check-version-consistency.sh \
-		$(DSH_VERSION) $(IMAGE_VERSION) $(PNPM_VERSION) $(UV_VERSION)
+		$(DSH_VERSION) $(PNPM_VERSION) $(UV_VERSION)
 
 verify: version-check
 

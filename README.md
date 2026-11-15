@@ -1,76 +1,66 @@
 # dsh-image
 
-Personal **lean** DeepSeek Harness container image: Web UI + agent shell tools, **no Chromium / noVNC / Browser Use**.
+在 Docker 里跑 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`@deepseek-ai/dsh`）的**瘦镜像**：Web 控制台 + 常用命令行工具，**不带 Chromium / noVNC / Browser Use**。
 
-China-first indexes: Debian → `mirrors.aliyun.com`, npm → `registry.npmmirror.com`, pip/uv → `mirrors.aliyun.com/pypi`.
+适合在本机或一台 Linux 服务器上长期起一份 DSH，数据落在挂载目录里，升级时换掉镜像 tag 即可。
 
-Pinned like [runzhliu/deepseek-harness-docker](https://github.com/runzhliu/deepseek-harness-docker):
+版本号与上游 npm `@deepseek-ai/dsh`、镜像 tag 一致（形如 `0.2.2-rc.3`）；Git 发布 tag 为 `dsh-v` + 同一串。具体版本看 [Releases](https://github.com/colinleefish/dsh-image/releases) 或仓库里的 `.env.example`。
 
-| Variable | Meaning | Current |
+国内拉镜像建议用阿里云 ACR（与 Docker Hub 为同一套构建产物）：
+
+```bash
+docker pull registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image:<版本>
+```
+
+海外或已有 Docker Hub 习惯：
+
+```bash
+docker pull docker.io/colinleefish/dsh-image:<版本>
+```
+
+## 和别的镜像比
+
+| | 本镜像 | 常见社区「全家桶」镜像 |
 | --- | --- | --- |
-| `DSH_VERSION` | npm `@deepseek-ai/dsh` | `0.2.2-rc.3` |
-| `DSH_IMAGE_VERSION` / `IMAGE_VERSION` | immutable image revision | `0.2.2-rc.3-r1` |
+| 体积 / 攻击面 | 无浏览器栈，偏瘦 | 常含 Chromium + noVNC |
+| 上游 DSH | 镜像 tag 与打包的 npm 版本一致 | 视维护者而定 |
+| 国内友好 | 运行态 apt / PyPI / 日常 npm 偏国内源 | 不一定 |
 
-Bump `IMAGE_VERSION` (`-r6`, …) for container-only changes. Bump `DSH_VERSION` only when packaging a new upstream npm release, and update every pin together (`make version-check`).
+镜像内已带：`git`、`openssh-client`、`curl`、`jq`、`ripgrep`、`postgresql-client`、`python3`、`uv` / `uvx`、`pnpm`、Node 24。
 
-Published tags (same digest family from CI):
+## 国内源：拉镜像之后容器里默认是啥
 
-- `registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image:<ver>`
-- `docker.io/colinleefish/dsh-image:<ver>`
+你 `docker pull` 的是**已经构建好**的镜像，里面的软件源在构建时写死，**一般不用再改**。在国内跑 agent 时，下列路径已偏向国内镜像：
 
-## Tools baked in
+| 用途 | 容器内默认 | 说明 |
+| --- | --- | --- |
+| Debian `apt` | `mirrors.aliyun.com` | 含 security 源替换 |
+| `pip` / `uv` / `uvx` | 阿里云 PyPI | 环境变量 `PIP_INDEX_URL`、`UV_INDEX_URL` |
+| 容器里后续 `npm` / `pnpm install` | `registry.npmmirror.com` | `NPM_CONFIG_REGISTRY` |
+| **`@deepseek-ai/dsh` 本体** | 构建时从 `registry.npmjs.org` 安装 | 已打进镜像；**运行时不会**再从 npmmirror 重装 |
 
-`git`, `openssh-client`, `curl`, `jq`, `ripgrep`, `postgresql-client` (`psql`), `python3`, `uv`/`uvx`, `vim-tiny`, `pnpm`, Node 24 (Trixie).
+要点：
 
-## GitHub Actions secrets
+- **用镜像的人**：直接得到「国内 apt / PyPI / 日常 npm」+「构建阶段从官方 npm 装好的固定版本 `dsh`」。
+- **`dsh` 不走 npmmirror**：`dsh` 带 Linux 原生扩展（C++/Rust 编译产物）。国内 npm 镜像有时只同步了 JS 部分、扩展包不完整，容器里可能启动失败或缺功能；因此**只在打镜像时**从官方 npm 安装，装完写进镜像。
+- **自己 `docker build` 本仓库**：默认同上；只有装 `@deepseek-ai/dsh` 的步骤走官方 npm，其余仍可用 build-arg 调整（见 `Dockerfile`、`.env.example`）。
 
-| Secret | Purpose |
-| --- | --- |
-| `DOCKERHUB_USERNAME` | Docker Hub user (e.g. `colinleefish`) |
-| `DOCKERHUB_TOKEN` | Docker Hub access token |
-| `ACR_USERNAME` | **旧版个人版**登录名 = 阿里云账号全名（常见为 `colinleefish@aliyun.com`，不是命名空间 `colinleefish`，也不是 AccessKey） |
-| `ACR_PASSWORD` | 容器镜像服务 → 访问凭证 里设置的**镜像仓库独立密码**（不是阿里云登录密码，也不是 AK Secret） |
+基板：**Node 24**（`node:24-trixie` / Debian 13）；**pnpm**、**uv** 等 pin 见 `.env.example`。
 
-Registry：`registry.cn-beijing.aliyuncs.com`（个人版北京）。不要填企业版 `*.cr.aliyuncs.com` / InstanceId。
-
-Workflow: `.github/workflows/publish.yml` — manual dispatch or tag `image-v0.2.2-rc.3-r1`.
-
-After a successful publish it creates GitHub Release `image-v<IMAGE_VERSION>` with pull commands and attaches `sha256sums.txt` (manifest digests for Hub + ACR). Re-running against an already-pushed tag skips rebuild and only refreshes the Release.
+## 快速开始
 
 ```bash
-gh secret set DOCKERHUB_USERNAME -R colinleefish/dsh-image
-gh secret set DOCKERHUB_TOKEN -R colinleefish/dsh-image
-gh secret set ACR_USERNAME -R colinleefish/dsh-image -b 'colinleefish@aliyun.com'
-gh secret set ACR_PASSWORD -R colinleefish/dsh-image
-```
-
-## Build
-
-```bash
+git clone https://github.com/colinleefish/dsh-image.git
+cd dsh-image
 cp .env.example .env
-# pins: DSH_VERSION=0.2.2-rc.3  DSH_IMAGE_VERSION=0.2.2-rc.3-r1
-make version-check
-make build
-make smoke
-```
-
-## Run
-
-```bash
-mkdir -p data/dot-dsh data/dot-ssh workspace
-cp .env.example .env
+# 在 .env 里设置 DSH_IMAGE_VERSION 为你要拉的 tag
+mkdir -p data/dot-dsh data/workspace
 docker compose up -d
 ```
 
-Web listens on host `127.0.0.1:3080`. Inside the container DSH binds loopback; `scripts/dsh-web-relay.cjs` publishes the container interface address.
-
-For a Tailscale / nginx front:
+浏览器打开：**http://127.0.0.1:3080/**  
+首次访问若返回 401，从容器日志里找 Web token（或按 DSH 文档配置登录门）。
 
 ```bash
-DSH_WEB_EXTRA_ARGS='--public-url http://100.84.0.2:3080 --trusted-host 100.84.0.2:3080'
+docker compose logs -f --tail=50 dsh
 ```
-
-## Agentbox notes
-
-- Postgres for this harness: see the agentbox workspace `AGENTS.md` (DeepSeek Harness only).
-- `compose.yaml` sinkholes `rmb.colinleefish.com` to `0.0.0.0`; pair with host `DOCKER-USER` DROP if you also block by IP.

@@ -2,9 +2,9 @@
 set -Eeuo pipefail
 
 dsh_version="${1:?missing DSH version}"
-image_version="${2:?missing image version}"
-pnpm_version="${3:?missing pnpm version}"
-uv_version="${4:?missing uv version}"
+pnpm_version="${2:?missing pnpm version}"
+uv_version="${3:?missing uv version}"
+image_version="${dsh_version}"
 
 require_literal() {
   local file="$1"
@@ -31,14 +31,13 @@ require_literal .env.example "UV_VERSION=${uv_version}"
 require_literal .env.example "registry.cn-beijing.aliyuncs.com/colinleefish"
 require_literal compose.yaml "DSH_IMAGE_VERSION:-${image_version}"
 require_literal compose.yaml 'DSH_IMAGE_REPOSITORY:-registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image'
-require_literal README.md "DSH_VERSION=${dsh_version}"
-require_literal README.md "${image_version}"
+require_literal README.md "registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image"
+require_literal README.md ".env.example"
 require_literal Makefile "DSH_VERSION ?= ${dsh_version}"
-require_literal Makefile "IMAGE_VERSION ?= \$(DSH_VERSION)-r1"
+require_literal Makefile "IMAGE_VERSION ?= \$(DSH_VERSION)"
 require_literal Makefile "PNPM_VERSION ?= ${pnpm_version}"
 require_literal Makefile "UV_VERSION ?= ${uv_version}"
 require_literal .github/workflows/publish.yml "DSH_VERSION: ${dsh_version}"
-require_literal .github/workflows/publish.yml "IMAGE_VERSION: ${image_version}"
 require_literal .github/workflows/publish.yml "PNPM_VERSION: ${pnpm_version}"
 require_literal .github/workflows/publish.yml "UV_VERSION: ${uv_version}"
 require_literal .github/workflows/publish.yml "docker.io/colinleefish/dsh-image"

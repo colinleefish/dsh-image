@@ -4,14 +4,13 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "image-v*"
+      - "dsh-v*"
 
 permissions:
   contents: write
 
 env:
   DSH_VERSION: 0.2.2-rc.3
-  IMAGE_VERSION: 0.2.2-rc.3-r1
   PNPM_VERSION: 10.15.1
   UV_VERSION: 0.9.7
   DOCKERHUB_IMAGE: docker.io/colinleefish/dsh-image
@@ -33,16 +32,24 @@ jobs:
         id: meta
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#image-v}"
+            ref="${GITHUB_REF_NAME}"
+            prefix="dsh-v"
+            version="${ref#"${prefix}"}"
+            if [[ "${ref}" == "${version}" ]]; then
+              echo "git tag must be dsh-v<DSH_VERSION> (e.g. dsh-v0.2.2-rc.3), got ${ref}" >&2
+              exit 1
+            fi
+            git_tag="${ref}"
           else
-            version="${IMAGE_VERSION}"
+            version="${DSH_VERSION}"
+            git_tag="dsh-v${DSH_VERSION}"
           fi
-          if [[ "${version}" != "${IMAGE_VERSION}" ]]; then
-            echo "tag ${version} does not match Makefile/IMAGE_VERSION ${IMAGE_VERSION}" >&2
+          if [[ "${version}" != "${DSH_VERSION}" ]]; then
+            echo "resolved version ${version} does not match pinned DSH_VERSION ${DSH_VERSION}" >&2
             exit 1
           fi
           echo "version=${version}" >>"${GITHUB_OUTPUT}"
-          echo "git_tag=image-v${version}" >>"${GITHUB_OUTPUT}"
+          echo "git_tag=${git_tag}" >>"${GITHUB_OUTPUT}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -63,33 +70,7 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Check existing image tags
-        id: images
-        env:
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          hub=false
-          acr=false
-          if docker buildx imagetools inspect "${DOCKERHUB_IMAGE}:${VERSION}" >/dev/null 2>&1; then
-            hub=true
-          fi
-          if docker buildx imagetools inspect "${ACR_IMAGE}:${VERSION}" >/dev/null 2>&1; then
-            acr=true
-          fi
-          echo "hub_exists=${hub}" >>"${GITHUB_OUTPUT}"
-          echo "acr_exists=${acr}" >>"${GITHUB_OUTPUT}"
-          if [[ "${hub}" == true && "${acr}" == true ]]; then
-            echo "build=false" >>"${GITHUB_OUTPUT}"
-            echo "Both registry tags already exist; skip rebuild"
-          elif [[ "${hub}" == true || "${acr}" == true ]]; then
-            echo "Only one registry has ${VERSION}; refusing partial republish" >&2
-            exit 1
-          else
-            echo "build=true" >>"${GITHUB_OUTPUT}"
-          fi
-
       - name: Build and push both registries
-        if: steps.images.outputs.build == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -137,10 +118,11 @@ jobs:
           cat >release-notes.md <<EOF
           ## dsh-image ${VERSION}
 
+          打包 [@deepseek-ai/dsh](https://www.npmjs.com/package/@deepseek-ai/dsh) **${DSH_VERSION}**。镜像 tag 与 npm 版本相同；同一 tag 可重复推送以覆盖 Digest（需 registry 侧允许）。
+
           | Pin | Value |
           | --- | --- |
-          | \`DSH_VERSION\` | \`${DSH_VERSION}\` (\`@deepseek-ai/dsh\`) |
-          | \`IMAGE_VERSION\` | \`${VERSION}\` |
+          | \`DSH_VERSION\` | \`${DSH_VERSION}\` |
 
           ### Pull
 
@@ -166,27 +148,6 @@ jobs:
           echo "acr_digest=${acr_digest}" >>"${GITHUB_OUTPUT}"
           cat sha256sums.txt
           cat release-notes.md
-
-      - name: Ensure git tags
-        env:
-          VERSION: ${{ steps.meta.outputs.version }}
-          GIT_TAG: ${{ steps.meta.outputs.git_tag }}
-          DSH_VERSION: ${{ env.DSH_VERSION }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          ensure_tag() {
-            local tag="$1"
-            local msg="$2"
-            if git rev-parse "refs/tags/${tag}" >/dev/null 2>&1; then
-              echo "tag ${tag} already exists"
-            else
-              git tag -a "${tag}" -m "${msg}"
-              git push origin "refs/tags/${tag}"
-            fi
-          }
-          ensure_tag "${GIT_TAG}" "dsh-image ${VERSION}"
-          ensure_tag "dsh-v${DSH_VERSION}" "upstream @deepseek-ai/dsh ${DSH_VERSION} (image ${VERSION})"
 
       - name: Create or update GitHub Release
         env:

@@ -2,7 +2,7 @@
 .env.*
 !.env.example
 data/
-workspace/
 *.tar
 *.tar.gz
 .DS_Store
+temp/

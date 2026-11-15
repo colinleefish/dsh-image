@@ -1,0 +1,137 @@
+# Watch deepseek-harness release tags (dsh-v*), bump pins, push dsh-v* to trigger publish.yml.
+# Does not follow npm dist-tags (latest/next) — only Git tags on the upstream repo.
+name: Sync upstream dsh release
+
+on:
+  schedule:
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Force-sync one Harness version (e.g. 0.2.2-rc.3); must exist as dsh-v* upstream
+        type: string
+        required: false
+        default: ''
+      dry_run:
+        description: Only print what would happen
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-dsh
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: deepseek-ai/deepseek-harness
+  # Semver after stripping dsh-v (alpha/rc/pre-releases included). Empty = no filter.
+  TAG_SUFFIX_PATTERN: '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pick target version
+        id: pick
+        env:
+          FORCE_VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          TAG_SUFFIX_PATTERN: ${{ env.TAG_SUFFIX_PATTERN }}
+        run: |
+          set -euo pipefail
+          mapfile -t upstream_tags < <(
+            gh api "repos/${UPSTREAM_REPO}/tags" --paginate -q '.[].name' \
+              | grep -E '^dsh-v' || true
+          )
+          mapfile -t our_tags < <(
+            gh api "repos/${GITHUB_REPOSITORY}/tags" --paginate -q '.[].name' \
+              | grep -E '^dsh-v' || true
+          )
+
+          declare -A have=()
+          for t in "${our_tags[@]}"; do have["$t"]=1; done
+
+          candidates=()
+          for t in "${upstream_tags[@]}"; do
+            ver="${t#dsh-v}"
+            if [[ "${ver}" == "${t}" ]]; then
+              continue
+            fi
+            if [[ -n "${TAG_SUFFIX_PATTERN}" && ! "${ver}" =~ ${TAG_SUFFIX_PATTERN} ]]; then
+              continue
+            fi
+            if [[ -z "${have[$t]+x}" ]]; then
+              candidates+=("${ver}")
+            fi
+          done
+
+          if [[ -n "${FORCE_VERSION}" ]]; then
+            target="${FORCE_VERSION}"
+            upstream_tag="dsh-v${target}"
+            if ! printf '%s\n' "${upstream_tags[@]}" | grep -Fxq "${upstream_tag}"; then
+              echo "upstream has no tag ${upstream_tag}" >&2
+              exit 1
+            fi
+          elif ((${#candidates[@]} == 0)); then
+            echo "nothing_to_sync=true" >>"${GITHUB_OUTPUT}"
+            echo "No new upstream tag matching ${TAG_SUFFIX_PATTERN}"
+            exit 0
+          else
+            # Highest matching semver among missing tags.
+            target="$(printf '%s\n' "${candidates[@]}" | sort -V | tail -n 1)"
+          fi
+
+          if [[ -n "${have[dsh-v${target}]+x}" ]]; then
+            echo "nothing_to_sync=true" >>"${GITHUB_OUTPUT}"
+            echo "dsh-v${target} already exists on this repo"
+            exit 0
+          fi
+
+          echo "target=${target}" >>"${GITHUB_OUTPUT}"
+          echo "git_tag=dsh-v${target}" >>"${GITHUB_OUTPUT}"
+          echo "dry_run=${DRY_RUN}" >>"${GITHUB_OUTPUT}"
+          echo "Will sync to ${target}"
+
+      - name: Dry run stop
+        if: steps.pick.outputs.dry_run == 'true' || steps.pick.outputs.nothing_to_sync == 'true'
+        run: |
+          if [[ "${{ steps.pick.outputs.dry_run }}" == 'true' && "${{ steps.pick.outputs.nothing_to_sync }}" != 'true' ]]; then
+            echo "dry-run only; no commit"
+          fi
+
+      - name: Bump pins and push tag
+        if: steps.pick.outputs.dry_run != 'true' && steps.pick.outputs.nothing_to_sync != 'true'
+        env:
+          TARGET: ${{ steps.pick.outputs.target }}
+          GIT_TAG: ${{ steps.pick.outputs.git_tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          chmod +x scripts/bump-dsh-version.sh
+          ./scripts/bump-dsh-version.sh "${TARGET}"
+
+          if git diff --quiet; then
+            echo "bump produced no diff" >&2
+            exit 1
+          fi
+
+          git add -A
+          git commit -m "$(cat <<EOF
+Bump @deepseek-ai/dsh to ${TARGET} (upstream dsh-v${TARGET}).
+
+Automated sync from ${UPSTREAM_REPO}.
+EOF
+)"
+          git push origin HEAD
+
+          git tag -a "${GIT_TAG}" -m "dsh-image ${TARGET} (upstream dsh-v${TARGET})"
+          git push origin "refs/tags/${GIT_TAG}"

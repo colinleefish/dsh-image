@@ -90,7 +90,7 @@ WORKDIR /workspace
 
 EXPOSE 3080
 
-ARG IMAGE_VERSION=0.2.2-rc.3-r1
+ARG IMAGE_VERSION=0.2.2-rc.3
 ARG IMAGE_REVISION=unknown
 LABEL org.opencontainers.image.title="colinleefish/dsh-image" \
       org.opencontainers.image.description="Lean DeepSeek Harness image without Chromium" \
