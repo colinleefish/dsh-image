@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 env:
-  DSH_VERSION: 0.2.2-rc.1
-  IMAGE_VERSION: 0.2.2-rc.1-r5
+  DSH_VERSION: 0.2.2-rc.3
+  IMAGE_VERSION: 0.2.2-rc.3-r1
   PNPM_VERSION: 10.15.1
   UV_VERSION: 0.9.7
   DOCKERHUB_IMAGE: docker.io/colinleefish/dsh-image

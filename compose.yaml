@@ -2,7 +2,7 @@ name: dsh-image
 
 services:
   dsh:
-    image: ${DSH_IMAGE_REPOSITORY:-registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image}:${DSH_IMAGE_VERSION:-0.2.2-rc.1-r5}
+    image: ${DSH_IMAGE_REPOSITORY:-registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image}:${DSH_IMAGE_VERSION:-0.2.2-rc.3-r1}
     container_name: dsh
     restart: unless-stopped
     env_file:
@@ -18,10 +18,13 @@ services:
       HOME: /workspace
       DSH_TELEMETRY_DISABLED: "1"
       DSH_WEB_EXTRA_ARGS: ${DSH_WEB_EXTRA_ARGS:-}
+      AGENTBOX_SHARED: ${AGENTBOX_SHARED:-/shared}
     volumes:
       - ${DSH_HOME_HOST:-./data/dot-dsh}:/home/node/.dsh
       - ${DSH_SSH_HOST:-./data/dot-ssh}:/home/node/.ssh
       - ${DSH_WORKSPACE:-./workspace}:/workspace
+      # Optional host Syncthing public folder (agentbox: /app/shared/agentbox-files).
+      - ${DSH_SHARED_HOST:-/app/shared/agentbox-files}:${AGENTBOX_SHARED:-/shared}
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=256m
