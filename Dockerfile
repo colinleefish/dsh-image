@@ -75,6 +75,8 @@ RUN rm -f /usr/local/bin/dsh \
 ENV DSH_HOME=/home/node/.dsh \
     DSH_TELEMETRY_DISABLED=1 \
     HOME=/workspace \
+    XDG_CONFIG_HOME=/home/node/.config \
+    XDG_CACHE_HOME=/home/node/.cache \
     NPM_CONFIG_CACHE=/home/node/.dsh/npm-cache \
     NPM_CONFIG_REGISTRY=${NPM_REGISTRY} \
     PIP_INDEX_URL=${PIP_INDEX_URL} \
@@ -82,8 +84,9 @@ ENV DSH_HOME=/home/node/.dsh \
     UV_INDEX_URL=${PIP_INDEX_URL} \
     NARB_DISABLE_NATIVE_CACHE=1
 
-RUN mkdir -p "${DSH_HOME}" /workspace \
- && chown -R node:node "${DSH_HOME}" /workspace
+RUN mkdir -p "${DSH_HOME}/pnpm-store" "${DSH_HOME}" /workspace /home/node/.config/pnpm \
+ && printf 'store-dir=%s\n' "${DSH_HOME}/pnpm-store" > /home/node/.config/pnpm/rc \
+ && chown -R node:node "${DSH_HOME}" /workspace /home/node/.config
 
 USER node
 WORKDIR /workspace

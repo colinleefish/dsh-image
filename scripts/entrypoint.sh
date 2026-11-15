@@ -27,7 +27,7 @@ handle_signal() {
 
 trap handle_signal INT TERM HUP
 
-mkdir -p "${DSH_HOME:-/home/node/.dsh}" "${HOME:-/workspace}"
+mkdir -p "${DSH_HOME:-/home/node/.dsh}/pnpm-store" "${DSH_HOME:-/home/node/.dsh}" "${HOME:-/workspace}"
 
 if [ "$#" -eq 0 ]; then
   set -- --profile web --no-open --port 3080
