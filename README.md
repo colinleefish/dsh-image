@@ -1,12 +1,16 @@
 # dsh-image
 
-在 Docker 里跑 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`@deepseek-ai/dsh`）的瘦镜像：Web 控制台和常用命令行工具，不含 Chromium、noVNC、Browser Use。
+在 Docker 里跑 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`@deepseek-ai/dsh`）的瘦镜像。
 
-镜像 tag 与上游 npm 版本相同。Git 发布 tag 为 `dsh-v` 加同一版本。
+包含：Web 控制台和常用命令行工具
 
-## 拉镜像
+不含：Chromium、noVNC、Browser Use。
 
-打开 [Releases](https://github.com/colinleefish/dsh-image/releases) 页面。选定版本后，按页里的 `docker pull` 命令拉取（含阿里云 ACR 与 Docker Hub）。
+镜像 tag 与 DSH 上游 npm 版本相同。
+
+## 拉取镜像
+
+[Releases](https://github.com/colinleefish/dsh-image/releases) 页面。
 
 ## 和别的镜像比
 
@@ -20,7 +24,7 @@
 
 ## 国内软件源
 
-拉下来的是已构建镜像，源在构建时写入，一般不用再改。
+镜像里已经换成了中国大陆的镜像源，包括 Debian / PyPI / NPM。
 
 | 用途 | 默认 |
 | --- | --- |
@@ -28,8 +32,6 @@
 | pip / uv | 阿里云 PyPI |
 | 容器内 npm / pnpm | npmmirror |
 | `@deepseek-ai/dsh` | 构建时从 registry.npmjs.org 安装，已写入镜像 |
-
-`dsh` 含 Linux 原生扩展。国内 npm 镜像有时不同步这些扩展包，构建阶段因此只用官方 npm，不用 npmmirror。
 
 ## 快速开始
 
