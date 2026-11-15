@@ -42,10 +42,13 @@ require_literal .github/workflows/publish.yml "registry.cn-beijing.aliyuncs.com/
 
 require_literal Dockerfile "ARG NPM_DSH_REGISTRY=https://registry.npmjs.org"
 
+require_literal Dockerfile "HOME=/home/node"
+require_literal Dockerfile "WORKDIR /home/node/workspace"
 require_literal Dockerfile "XDG_CONFIG_HOME=/home/node/.config"
 require_literal Dockerfile "store-dir="
 require_literal Dockerfile "pnpm-store"
 require_literal Dockerfile "NARB_DISABLE_NATIVE_CACHE=1"
+require_literal compose.yaml "./data/home:/home/node"
 
 require_literal Dockerfile "COPY scripts/dsh /opt/dsh-image/dsh"
 require_literal Dockerfile "rm -f /usr/local/bin/dsh"

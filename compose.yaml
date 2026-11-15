@@ -19,8 +19,7 @@ services:
       DSH_TELEMETRY_DISABLED: "1"
       DSH_WEB_EXTRA_ARGS: ${DSH_WEB_EXTRA_ARGS:-}
     volumes:
-      - ./data/dot-dsh:/home/node/.dsh
-      - ./data/workspace:/workspace
+      - ./data/home:/home/node
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=256m

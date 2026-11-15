@@ -121,7 +121,9 @@ gh secret set ACR_PASSWORD -R colinleefish/dsh-image
 
 ## 实现备忘
 
-- pnpm：`XDG_CONFIG_HOME=/home/node/.config`，`store-dir` 写在 `/home/node/.config/pnpm/rc`，内容指向 `${DSH_HOME}/pnpm-store`（与卷持久化）。`HOME=/workspace` 时插件/`pnpm` 仍用该 store。
+- 持久化：compose 只挂 `./data/home:/home/node`（`HOME=/home/node`，`WORKDIR=/home/node/workspace`，`DSH_HOME=/home/node/.dsh`）。勿再使用 `HOME=/workspace` 双卷布局。
+- pnpm：`XDG_CONFIG_HOME=/home/node/.config`，`store-dir` 在镜像内写入 `pnpm/rc`，空卷首次启动时由 `entrypoint.sh` 补写；store 在 `${DSH_HOME}/pnpm-store`。
+- 从旧布局迁移：把原 `data/dot-dsh` 挪到 `data/home/.dsh`，原 `data/workspace` 挪到 `data/home/workspace`，删掉 compose 里分卷挂载。
 - Web 对外：`scripts/dsh-web-relay.cjs` 在容器内把回环上的 DSH Web 转到容器网络接口。
 - 全局 `dsh` 可执行文件为 wrapper（`scripts/dsh`），避免在只读根文件系统下从 `noexec` 的 `/tmp` 加载 native addon。
 - `@deepseek-ai/dsh` 必须从 `registry.npmjs.org` 安装；其它 npm 包可走 `registry.npmmirror.com`。

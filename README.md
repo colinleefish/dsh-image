@@ -39,8 +39,10 @@
 git clone https://github.com/colinleefish/dsh-image.git
 cd dsh-image
 cp .env.example .env
-mkdir -p data/dot-dsh data/workspace
+mkdir -p data/home/workspace
 docker compose up -d
 ```
+
+持久化目录挂载在容器内的 `/home/node`：`DSH_HOME` 为其中的 `.dsh`，Agent 默认工作目录为 `workspace/`。
 
 在 `.env` 里设置 `DSH_IMAGE_VERSION` 为 [Releases](https://github.com/colinleefish/dsh-image/releases) 中的版本。浏览器打开 `http://127.0.0.1:3080/`。若返回 401，从 `docker compose logs` 查看 Web token。

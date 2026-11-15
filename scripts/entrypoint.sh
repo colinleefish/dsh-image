@@ -27,7 +27,16 @@ handle_signal() {
 
 trap handle_signal INT TERM HUP
 
-mkdir -p "${DSH_HOME:-/home/node/.dsh}/pnpm-store" "${DSH_HOME:-/home/node/.dsh}" "${HOME:-/workspace}"
+dsh_home="${DSH_HOME:-/home/node/.dsh}"
+home="${HOME:-/home/node}"
+workspace="/home/node/workspace"
+config_home="${XDG_CONFIG_HOME:-${home}/.config}"
+
+mkdir -p "${dsh_home}/pnpm-store" "${dsh_home}" "${config_home}/pnpm" "${workspace}"
+pnpm_rc="${config_home}/pnpm/rc"
+if [ ! -f "${pnpm_rc}" ]; then
+  printf 'store-dir=%s\n' "${dsh_home}/pnpm-store" > "${pnpm_rc}"
+fi
 
 if [ "$#" -eq 0 ]; then
   set -- --profile web --no-open --port 3080
