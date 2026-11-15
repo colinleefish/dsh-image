@@ -12,18 +12,14 @@ services:
       - "127.0.0.1:${DSH_PORT:-3080}:3080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "rmb.colinleefish.com:0.0.0.0"
     environment:
       TZ: Asia/Shanghai
       HOME: /workspace
       DSH_TELEMETRY_DISABLED: "1"
       DSH_WEB_EXTRA_ARGS: ${DSH_WEB_EXTRA_ARGS:-}
-      AGENTBOX_SHARED: ${AGENTBOX_SHARED:-/shared}
     volumes:
       - ${DSH_HOME_HOST:-./data/dot-dsh}:/home/node/.dsh
       - ${DSH_WORKSPACE:-./data/workspace}:/workspace
-      # Optional host Syncthing public folder (agentbox: /app/shared/agentbox-files).
-      - ${DSH_SHARED_HOST:-/app/shared/agentbox-files}:${AGENTBOX_SHARED:-/shared}
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=256m
