@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: sync-upstream-dsh
@@ -133,3 +134,6 @@ jobs:
 
           git tag -a "${GIT_TAG}" -m "dsh-image ${TARGET} (upstream dsh-v${TARGET})"
           git push origin "refs/tags/${GIT_TAG}"
+
+          # GITHUB_TOKEN tag pushes do not trigger other workflows; dispatch publish explicitly.
+          gh workflow run publish.yml --ref "${GIT_TAG}"
