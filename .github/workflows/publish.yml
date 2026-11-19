@@ -10,9 +10,8 @@ permissions:
   contents: write
 
 env:
-  DSH_VERSION: 0.2.2-rc.3
-  PNPM_VERSION: 10.15.1
-  UV_VERSION: 0.9.7
+  # Version pins live in Makefile; loaded below so sync-upstream need not edit this file
+  # (GITHUB_TOKEN cannot push workflow changes without workflows permission).
   DOCKERHUB_IMAGE: docker.io/colinleefish/dsh-image
   ACR_IMAGE: registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
   PLATFORMS: linux/amd64
@@ -24,6 +23,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Load pins from Makefile
+        run: |
+          set -euo pipefail
+          {
+            echo "DSH_VERSION=$(grep -E '^DSH_VERSION \?=' Makefile | sed 's/^DSH_VERSION ?= //')"
+            echo "PNPM_VERSION=$(grep -E '^PNPM_VERSION \?=' Makefile | sed 's/^PNPM_VERSION ?= //')"
+            echo "UV_VERSION=$(grep -E '^UV_VERSION \?=' Makefile | sed 's/^UV_VERSION ?= //')"
+          } >>"${GITHUB_ENV}"
 
       - name: Version consistency
         run: make version-check

@@ -46,7 +46,7 @@ fi
 if grep -Fq -- "${old_version}" MAINTAINERS.md 2>/dev/null; then
   replace_in_file MAINTAINERS.md
 fi
-replace_in_file .github/workflows/publish.yml
+# Do not edit .github/workflows/* — GITHUB_TOKEN cannot push workflow file changes.
 
 make version-check
 printf 'bumped dsh %s -> %s\n' "${old_version}" "${new_version}"

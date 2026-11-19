@@ -34,9 +34,8 @@ require_literal Makefile "DSH_VERSION ?= ${dsh_version}"
 require_literal Makefile "IMAGE_VERSION ?= \$(DSH_VERSION)"
 require_literal Makefile "PNPM_VERSION ?= ${pnpm_version}"
 require_literal Makefile "UV_VERSION ?= ${uv_version}"
-require_literal .github/workflows/publish.yml "DSH_VERSION: ${dsh_version}"
-require_literal .github/workflows/publish.yml "PNPM_VERSION: ${pnpm_version}"
-require_literal .github/workflows/publish.yml "UV_VERSION: ${uv_version}"
+# publish.yml loads DSH/PNPM/UV from Makefile — do not pin versions in the workflow file.
+require_literal .github/workflows/publish.yml "Load pins from Makefile"
 require_literal .github/workflows/publish.yml "docker.io/colinleefish/dsh-image"
 require_literal .github/workflows/publish.yml "registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image"
 
