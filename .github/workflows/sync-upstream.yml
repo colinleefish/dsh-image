@@ -125,12 +125,8 @@ jobs:
           fi
 
           git add -A
-          git commit -m "$(cat <<EOF
-Bump @deepseek-ai/dsh to ${TARGET} (upstream dsh-v${TARGET}).
-
-Automated sync from ${UPSTREAM_REPO}.
-EOF
-)"
+          git commit -m "Bump @deepseek-ai/dsh to ${TARGET} (upstream dsh-v${TARGET})." \
+            -m "Automated sync from ${UPSTREAM_REPO}."
           git push origin HEAD
 
           git tag -a "${GIT_TAG}" -m "dsh-image ${TARGET} (upstream dsh-v${TARGET})"
