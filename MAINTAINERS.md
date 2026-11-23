@@ -10,20 +10,20 @@
 
 | 用途 | 形式 | 示例 |
 | --- | --- | --- |
-| npm `@deepseek-ai/dsh` | 纯 semver，**无** `v` | `0.2.3-alpha.2` |
-| 上游 Git tag | 前缀 `dsh-v` + 同上 semver | `dsh-v0.2.3-alpha.2` |
-| 上游 GitHub Release 标题 | 常写成 `v0.2.3-alpha.2` | 实际 tag 仍是 `dsh-v0.2.3-alpha.2` |
-| 上游 npm dist-tag | 预发行走 `next` / `alpha`，`latest` 可能落后于 `next` | 当前 `next`→`0.2.3-alpha.2`，`latest`→`0.2.2-rc.1` |
+| npm `@deepseek-ai/dsh` | 纯 semver，**无** `v` | `0.2.2-rc.2` |
+| 上游 Git tag | 前缀 `dsh-v` + 同上 semver | `dsh-v0.2.2-rc.2` |
+| 上游 GitHub Release 标题 | 常写成 `v0.2.2-rc.2` | 实际 tag 仍是 `dsh-v0.2.2-rc.2` |
+| 上游 npm dist-tag | 预发行走 `next` / `alpha`，`latest` 可能落后于 `next` | 当前 `next`→`0.2.2-rc.2`，`latest`→`0.2.2-rc.1` |
 
 本镜像 **严格追随 npm 里的 Harness 版本字符串**：
 
 | 用途 | 形式 | 示例 |
 | --- | --- | --- |
-| 仓库 pin / `DSH_VERSION` | 与 npm 相同 | `0.2.3-alpha.2` |
-| 镜像 tag（ACR / Docker Hub） | 与 npm 相同（**不要**加 `v`） | `0.2.3-alpha.2` |
-| 本仓库 Git tag / Release | 与上游一致 | `dsh-v0.2.3-alpha.2` |
+| 仓库 pin / `DSH_VERSION` | 与 npm 相同 | `0.2.2-rc.2` |
+| 镜像 tag（ACR / Docker Hub） | 与 npm 相同（**不要**加 `v`） | `0.2.2-rc.2` |
+| 本仓库 Git tag / Release | 与上游一致 | `dsh-v0.2.2-rc.2` |
 
-镜像 tag 不加 `v`，是因为 Harness 的权威版本号在 **npm 与 `package.json` 的 `"version"` 字段**，不是 GitHub Release 标题里的 `v…`。Git 上的 `dsh-v` / Release 标题里的 `v` 只是发布标记；`docker pull …:0.2.3-alpha.2` 应与 `npm i @deepseek-ai/dsh@0.2.3-alpha.2` 同一串数字。
+镜像 tag 不加 `v`，是因为 Harness 的权威版本号在 **npm 与 `package.json` 的 `"version"` 字段**，不是 GitHub Release 标题里的 `v…`。Git 上的 `dsh-v` / Release 标题里的 `v` 只是发布标记；`docker pull …:0.2.2-rc.2` 应与 `npm i @deepseek-ai/dsh@0.2.2-rc.2` 同一串数字。
 
 不再使用 `-r1`、`-r2`，也不再使用本仓库私有的 `image-v…` 双 tag 体系。
 
@@ -47,10 +47,10 @@ Registry（Docker Hub / 个人版 ACR）已配置为**允许同名 tag 覆盖**�
 Git 侧若要重跑 Actions 触发同一 Harness 版本：
 
 ```bash
-git tag -d dsh-v0.2.3-alpha.2
-git push origin :refs/tags/dsh-v0.2.3-alpha.2
-git tag -a dsh-v0.2.3-alpha.2 -m "dsh-image 0.2.3-alpha.2"
-git push origin dsh-v0.2.3-alpha.2
+git tag -d dsh-v0.2.2-rc.2
+git push origin :refs/tags/dsh-v0.2.2-rc.2
+git tag -a dsh-v0.2.2-rc.2 -m "dsh-image 0.2.2-rc.2"
+git push origin dsh-v0.2.2-rc.2
 ```
 
 或直接用 Actions **workflow_dispatch**（使用 `publish.yml` 里 env 的 `DSH_VERSION`）。
@@ -76,7 +76,7 @@ Workflow：`.github/workflows/sync-upstream.yml`
 3. 每次运行最多处理**一个**缺失版本：在「尚未同步」的 tag 里取 **semver 最高** 的那条，避免一次 commit 跳过多版。
 4. bump → commit → `dsh-v<版本>` → **`publish.yml` 自动构建** 镜像 `…:<版本>`。
 
-手动试跑：Actions → Sync upstream dsh release → `dry_run: true`；或 `version: 0.2.3-alpha.2` 强制某一版。
+手动试跑：Actions → Sync upstream dsh release → `dry_run: true`；或 `version: 0.2.2-rc.2` 强制某一版。
 
 若要临时不跟某一类（极少需要）：再改 workflow 里的 `TAG_SUFFIX_PATTERN` 或给 workflow 加 exclude 列表。
 
@@ -86,18 +86,18 @@ Workflow：`.github/workflows/sync-upstream.yml`
 
 Workflow：`.github/workflows/publish.yml`
 
-- 推送 **`dsh-v<DSH_VERSION>`**（如 `dsh-v0.2.3-alpha.2`）触发构建；或 workflow_dispatch。
+- 推送 **`dsh-v<DSH_VERSION>`**（如 `dsh-v0.2.2-rc.2`）触发构建；或 workflow_dispatch。
 - 推送镜像：`docker.io/colinleefish/dsh-image:<DSH_VERSION>` 与 `registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image:<DSH_VERSION>`。
 
 ### 要不要 `latest`？
 
 **建议默认不要推 Docker `latest`。**
 
-上游 npm 在 RC 阶段用 **`next`** 表示最新预发行，**`latest` 刻意可能旧一档**（例如 `next`→`0.2.3-alpha.2` 而 `latest` 仍停在 `0.2.2-rc.1`）。镜像若也打 `latest`，会与「跟 npm 版本一一对应」冲突，且无法区分你在跟 `next` 还是稳定线。
+上游 npm 在 RC 阶段用 **`next`** 表示最新预发行，**`latest` 刻意可能旧一档**（例如 `next`→`0.2.2-rc.2` 而 `latest` 仍停在 `0.2.2-rc.1`）。镜像若也打 `latest`，会与「跟 npm 版本一一对应」冲突，且无法区分你在跟 `next` 还是稳定线。
 
 务实做法：
 
-- 日常：`docker pull …:0.2.3-alpha.2` 与 npm 同版本。
+- 日常：`docker pull …:0.2.2-rc.2` 与 npm 同版本。
 - 若你希望「始终等于仓库当前 pin」：在 compose 里写死 `DSH_IMAGE_VERSION`，升级时改 pin + 重拉，而不是依赖 `latest`。
 - 以后若稳定版 `0.2.x` 出洞且只维护一条推荐线，可**额外**推 `latest` 指向该稳定 semver；RC 阶段若要滚动跟踪，可考虑模仿上游推别名 **`next`**（指向当前 `DSH_VERSION`），仍不推荐 `latest`。
 
