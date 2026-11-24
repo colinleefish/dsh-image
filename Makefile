@@ -2,7 +2,7 @@
 IMAGE ?= registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
 DOCKERHUB_IMAGE ?= docker.io/colinleefish/dsh-image
 ACR_IMAGE ?= registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
-DSH_VERSION ?= 0.2.2-alpha.3
+DSH_VERSION ?= 0.2.3-alpha.2
 IMAGE_VERSION ?= $(DSH_VERSION)
 NODE_IMAGE ?= docker.io/library/node:24-trixie
 PNPM_VERSION ?= 10.15.1
