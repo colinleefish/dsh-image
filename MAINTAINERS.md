@@ -13,7 +13,7 @@
 | npm `@deepseek-ai/dsh` | 纯 semver，**无** `v` | `0.2.2-alpha.3` |
 | 上游 Git tag | 前缀 `dsh-v` + 同上 semver | `dsh-v0.2.2-alpha.3` |
 | 上游 GitHub Release 标题 | 常写成 `v0.2.2-alpha.3` | 实际 tag 仍是 `dsh-v0.2.2-alpha.3` |
-| 上游 npm dist-tag | 预发行走 `next` / `alpha`，`latest` 可能落后于 `next` | 当前 `next`→`0.2.2-alpha.3`，`latest`→`0.2.2-alpha.3` |
+| 上游 npm dist-tag | 预发行走 `next` / `alpha`，`latest` 可能落后于 `next` | 不作为镜像跟随依据 |
 
 本镜像 **严格追随 npm 里的 Harness 版本字符串**：
 
@@ -29,7 +29,7 @@
 
 只改 Dockerfile / 脚本、仍打包同一 npm 版本时：**保持 `DSH_VERSION` 不变**，修完后对**同一个** Git tag 与镜像 tag 重新发布（见下文覆盖推送）。
 
-升级上游 DSH 时：改全仓 pin 为新的 `DSH_VERSION`，打新的 `v<新版本>`。
+升级上游 DSH 时：改全仓 pin 为新的 `DSH_VERSION`，打新的 `dsh-v<新版本>`。
 
 校验：
 
@@ -65,22 +65,29 @@ make build
 make smoke
 ```
 
-## 自动跟上游 Harness 发版（可选）
+## 自动跟上游 Harness 发版
 
 不跟 npm 的 `latest` / `next`，只认上游仓库 **Git tag `dsh-v*`**（与 `release-publish.yml` 一致）。
 
-Workflow：`.github/workflows/sync-upstream.yml`
+Workflow：`.github/workflows/sync-upstream.yml`。决策在 `scripts/plan_dsh_sync.py`，执行在 `scripts/apply-dsh-sync.sh`。
 
-1. 每 6 小时（或手动 **workflow_dispatch**）用 GitHub API 拉 `deepseek-ai/deepseek-harness` 的 `dsh-v*` 列表。
-2. 默认**全跟**上游所有 `dsh-v*`（含 alpha/rc）；仅跳过本仓库已有的 tag。`TAG_SUFFIX_PATTERN` 只做 sanity check（标准 semver 形），不是用来锁死在 0.2.2 线。
-3. 每次运行最多处理**一个**缺失版本：在「尚未同步」的 tag 里取 **semver 最高** 的那条，避免一次 commit 跳过多版。
-4. bump → commit → `dsh-v<版本>` → **`publish.yml` 自动构建** 镜像 `…:<版本>`。
+每次运行只做一件事，按这个顺序挑：
 
-手动试跑：Actions → Sync upstream dsh release → `dry_run: true`；或 `version: 0.2.2-alpha.3` 强制某一版。
+1. 每 6 小时（或手动 **workflow_dispatch**）用 GitHub API 列出上游 `dsh-v*`。`TAG_SUFFIX_PATTERN` 只检查版本是 semver（含 alpha/rc），不把跟随范围锁在某一条小版本上。
+2. 当前最高版本 = `main` 上的 `DSH_VERSION` 与本仓库已有 `dsh-v*` tag 里，semver 更高的那个。
+3. 上游有更高版本时，取其中**最低**的一个，把 pin 提交到 `main`，打 tag，再触发 `publish.yml`。`main` 只往更高版本走。
+4. `main` 的 pin 低于当前最高版本时，把 pin 提交到那个最高版本。已有 tag 留在原来的提交上。
+5. `main` 这一版还没有 tag，或 tag 在但 GitHub Release 还没有时，补打 tag 和/或再次触发 `publish.yml`。pin 已经一致、文件没有改动，也会做这一步。
+6. 其他 tag 已经在、Release 还没有时，再次触发 `publish.yml`。该版本在最近 12 小时内发布失败的，本轮跳过，继续做下一件事。
+7. 比当前最高版本旧、且本仓库还没有的 tag：从当前 `main` 的打包文件做一份临时提交，只改 pin，推 tag，不推 `main`，然后触发 `publish.yml`。一次补这些旧版本里最高的一个。
 
-若要临时不跟某一类（极少需要）：再改 workflow 里的 `TAG_SUFFIX_PATTERN` 或给 workflow 加 exclude 列表。
+镜像有没有发布，看这个 tag 的 GitHub Release 在不在。`publish.yml` 在两个 registry 都推完之后才创建 Release。
 
-若仓库在 GitLab：同样逻辑放在 scheduled pipeline + `rules: if: $CI_COMMIT_TAG =~ /^dsh-v/` 即可；本仓库当前是 **GitHub Actions**。
+手动试跑：Actions → Sync upstream dsh release → `dry_run: true`。`version` 填一个上游已有版本时，比 `main` 新的提交到 `main`；比 `main` 旧的只打 tag，不移动 `main`。
+
+tag 推送和 `workflow_dispatch` 会重试几次。`GITHUB_TOKEN` 推上去的 tag 不会触发其他 workflow，所以同步任务自己启动 `publish.yml`。
+
+若要临时不跟某一类：改 workflow 里的 `TAG_SUFFIX_PATTERN`，或给 workflow 加 exclude 列表。
 
 ## CI 发布
 
@@ -93,7 +100,7 @@ Workflow：`.github/workflows/publish.yml`
 
 **建议默认不要推 Docker `latest`。**
 
-上游 npm 在 RC 阶段用 **`next`** 表示最新预发行，**`latest` 刻意可能旧一档**（例如 `next`→`0.2.2-alpha.3` 而 `latest` 仍停在 `0.2.2-alpha.3`）。镜像若也打 `latest`，会与「跟 npm 版本一一对应」冲突，且无法区分你在跟 `next` 还是稳定线。
+上游 npm 在 RC 阶段用 **`next`** 表示最新预发行，**`latest` 刻意可能旧一档**。镜像若也打 `latest`，会与「跟 npm 版本一一对应」冲突，且无法区分你在跟 `next` 还是稳定线。
 
 务实做法：
 

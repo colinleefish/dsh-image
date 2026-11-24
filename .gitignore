@@ -5,4 +5,6 @@ data/
 *.tar
 *.tar.gz
 .DS_Store
+__pycache__/
+*.pyc
 temp/

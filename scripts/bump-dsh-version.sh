@@ -43,9 +43,8 @@ replace_in_file compose.yaml
 if grep -Fq -- "${old_version}" README.md 2>/dev/null; then
   replace_in_file README.md
 fi
-if grep -Fq -- "${old_version}" MAINTAINERS.md 2>/dev/null; then
-  replace_in_file MAINTAINERS.md
-fi
+# Do not edit MAINTAINERS.md. It mentions several versions at once; a global
+# replace rewrites older examples, including the npm dist-tag sentence.
 # Do not edit .github/workflows/* — GITHUB_TOKEN cannot push workflow file changes.
 
 make version-check
