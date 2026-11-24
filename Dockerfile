@@ -7,7 +7,7 @@
 ARG NODE_IMAGE=docker.io/library/node:24-trixie
 FROM ${NODE_IMAGE}
 
-ARG DSH_VERSION=0.2.2-rc.1
+ARG DSH_VERSION=0.2.2-alpha.3
 ARG PNPM_VERSION=10.15.1
 ARG UV_VERSION=0.9.7
 ARG NPM_REGISTRY=https://registry.npmmirror.com
@@ -93,7 +93,7 @@ WORKDIR /home/node/workspace
 
 EXPOSE 3080
 
-ARG IMAGE_VERSION=0.2.2-rc.1
+ARG IMAGE_VERSION=0.2.2-alpha.3
 ARG IMAGE_REVISION=unknown
 LABEL org.opencontainers.image.title="colinleefish/dsh-image" \
       org.opencontainers.image.description="Lean DeepSeek Harness image without Chromium" \
