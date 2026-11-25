@@ -10,7 +10,11 @@
 
 ## 拉取镜像
 
-[Releases](https://github.com/colinleefish/dsh-image/releases) 页面。
+已发布版本见 [IMAGES.md](IMAGES.md)（最新在最前面）。
+
+```bash
+docker pull registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image:<版本>
+```
 
 ## 和别的镜像比
 
@@ -45,4 +49,4 @@ docker compose up -d
 
 持久化目录挂载在容器内的 `/home/node`：`DSH_HOME` 为其中的 `.dsh`，Agent 默认工作目录为 `workspace/`。
 
-在 `.env` 里设置 `DSH_IMAGE_VERSION` 为 [Releases](https://github.com/colinleefish/dsh-image/releases) 中的版本。浏览器打开 `http://127.0.0.1:3080/`。若返回 401，从 `docker compose logs` 查看 Web token。
+在 `.env` 里设置 `DSH_IMAGE_VERSION` 为 [IMAGES.md](IMAGES.md) 中的版本。浏览器打开 `http://127.0.0.1:3080/`。若返回 401，从 `docker compose logs` 查看 Web token。

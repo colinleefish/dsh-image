@@ -1,17 +1,38 @@
+# Look at upstream dsh-v* tags, publish the next newer image from main, record it.
+# Does not follow npm dist-tags (latest/next). Does not create git tags or GitHub Releases.
 name: Publish image
 
 on:
+  schedule:
+    - cron: '15 */6 * * *'
   workflow_dispatch:
-  push:
-    tags:
-      - "dsh-v*"
+    inputs:
+      version:
+        description: Publish this Harness version (must exist as upstream dsh-v*)
+        type: string
+        required: false
+        default: ''
+      force:
+        description: Rebuild even if this version is already in IMAGES.md
+        type: boolean
+        required: false
+        default: false
+      dry_run:
+        description: Only print the plan
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
 
+concurrency:
+  group: publish-dsh-image
+  cancel-in-progress: false
+
 env:
-  # Version pins live in Makefile; loaded below so sync-upstream need not edit this file
-  # (GITHUB_TOKEN cannot push workflow changes without workflows permission).
+  UPSTREAM_REPO: deepseek-ai/deepseek-harness
+  TAG_SUFFIX_PATTERN: '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
   DOCKERHUB_IMAGE: docker.io/colinleefish/dsh-image
   ACR_IMAGE: registry.cn-beijing.aliyuncs.com/colinleefish/dsh-image
   PLATFORMS: linux/amd64
@@ -19,10 +40,10 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Load pins from Makefile
         run: |
@@ -33,66 +54,104 @@ jobs:
             echo "UV_VERSION=$(grep -E '^UV_VERSION \?=' Makefile | sed 's/^UV_VERSION ?= //')"
           } >>"${GITHUB_ENV}"
 
-      - name: Version consistency
-        run: make version-check
-
-      - name: Resolve tag
-        id: meta
+      - name: Plan
+        id: plan
+        env:
+          FORCE_VERSION: ${{ inputs.version }}
+          FORCE_REBUILD: ${{ inputs.force }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            ref="${GITHUB_REF_NAME}"
-            prefix="dsh-v"
-            version="${ref#"${prefix}"}"
-            if [[ "${ref}" == "${version}" ]]; then
-              echo "git tag must be dsh-v<DSH_VERSION> (e.g. dsh-v0.2.2-rc.3), got ${ref}" >&2
-              exit 1
-            fi
-            git_tag="${ref}"
-          else
-            version="${DSH_VERSION}"
-            git_tag="dsh-v${DSH_VERSION}"
-          fi
-          if [[ "${version}" != "${DSH_VERSION}" ]]; then
-            echo "resolved version ${version} does not match pinned DSH_VERSION ${DSH_VERSION}" >&2
+          set -euo pipefail
+          tmp="${RUNNER_TEMP}/dsh-publish"
+          mkdir -p "${tmp}"
+          gh api "repos/${UPSTREAM_REPO}/tags" --paginate -q '.[].name' >"${tmp}/upstream.txt"
+          if [[ ! -s "${tmp}/upstream.txt" ]]; then
+            echo "upstream tag list is empty" >&2
             exit 1
           fi
-          echo "version=${version}" >>"${GITHUB_OUTPUT}"
-          echo "git_tag=${git_tag}" >>"${GITHUB_OUTPUT}"
+          dry="false"
+          rebuild="false"
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            dry="true"
+          fi
+          if [[ "${FORCE_REBUILD}" == "true" ]]; then
+            rebuild="true"
+          fi
+          python3 scripts/dsh_catalog.py plan \
+            --upstream-file "${tmp}/upstream.txt" \
+            --main-version "${DSH_VERSION}" \
+            --force "${FORCE_VERSION}" \
+            --force-rebuild "${rebuild}" \
+            --pattern "${TAG_SUFFIX_PATTERN}" \
+            --dry-run "${dry}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Stop
+        if: steps.plan.outputs.action == 'none' || steps.plan.outputs.dry_run == 'true'
+        run: echo "${{ steps.plan.outputs.reason }}"
+
+      - name: Bump pin
+        if: steps.plan.outputs.action != 'none' && steps.plan.outputs.dry_run != 'true' && steps.plan.outputs.bump_pin == 'true'
+        env:
+          SYNC_VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/bump-dsh-version.sh
+          ./scripts/bump-dsh-version.sh "${SYNC_VERSION}"
+
+      - name: Version consistency
+        if: steps.plan.outputs.action != 'none' && steps.plan.outputs.dry_run != 'true'
+        run: make version-check
 
       - name: Set up QEMU
+        if: steps.plan.outputs.action != 'none' && steps.plan.outputs.dry_run != 'true'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
+        if: steps.plan.outputs.action != 'none' && steps.plan.outputs.dry_run != 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login Docker Hub
+        if: steps.plan.outputs.action != 'none' && steps.plan.outputs.dry_run != 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login Aliyun ACR (beijing personal)
+        if: steps.plan.outputs.action != 'none' && steps.plan.outputs.dry_run != 'true'
         uses: docker/login-action@v3
         with:
           registry: registry.cn-beijing.aliyuncs.com
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
+      - name: Inspect existing image
+        id: existing
+        if: steps.plan.outputs.action != 'none' && steps.plan.outputs.dry_run != 'true' && github.event.inputs.force != 'true'
+        env:
+          SYNC_VERSION: ${{ steps.plan.outputs.version }}
+        run: bash scripts/inspect-dsh-image.sh
+
       - name: Build and push both registries
+        id: build
+        if: >
+          steps.plan.outputs.action != 'none' &&
+          steps.plan.outputs.dry_run != 'true' &&
+          (github.event.inputs.force == 'true' || steps.existing.outputs.found != 'true')
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          # Personal ACR rejects OCI attestations (vnd.oci.empty.v1+json).
           provenance: false
           sbom: false
           platforms: ${{ env.PLATFORMS }}
           tags: |
-            ${{ env.DOCKERHUB_IMAGE }}:${{ steps.meta.outputs.version }}
-            ${{ env.ACR_IMAGE }}:${{ steps.meta.outputs.version }}
+            ${{ env.DOCKERHUB_IMAGE }}:${{ steps.plan.outputs.version }}
+            ${{ env.ACR_IMAGE }}:${{ steps.plan.outputs.version }}
           build-args: |
-            DSH_VERSION=${{ env.DSH_VERSION }}
-            IMAGE_VERSION=${{ steps.meta.outputs.version }}
+            DSH_VERSION=${{ steps.plan.outputs.version }}
+            IMAGE_VERSION=${{ steps.plan.outputs.version }}
             IMAGE_REVISION=${{ github.sha }}
             PNPM_VERSION=${{ env.PNPM_VERSION }}
             UV_VERSION=${{ env.UV_VERSION }}
@@ -100,13 +159,11 @@ jobs:
             NPM_REGISTRY=https://registry.npmmirror.com
             PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
-      - name: Collect digests and write release notes
-        id: release_files
+      - name: Collect digests
+        id: digests
+        if: steps.build.outcome == 'success'
         env:
-          VERSION: ${{ steps.meta.outputs.version }}
-          DSH_VERSION: ${{ env.DSH_VERSION }}
-          DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
-          ACR_IMAGE: ${{ env.ACR_IMAGE }}
+          VERSION: ${{ steps.plan.outputs.version }}
         run: |
           set -euo pipefail
           digest_of() {
@@ -119,58 +176,25 @@ jobs:
             exit 1
           fi
           {
-            echo "${hub_digest}  ${DOCKERHUB_IMAGE}:${VERSION}"
-            echo "${acr_digest}  ${ACR_IMAGE}:${VERSION}"
-          } >sha256sums.txt
+            echo "hub_digest=${hub_digest}"
+            echo "acr_digest=${acr_digest}"
+          } >>"${GITHUB_OUTPUT}"
+          echo "${hub_digest}  ${DOCKERHUB_IMAGE}:${VERSION}"
+          echo "${acr_digest}  ${ACR_IMAGE}:${VERSION}"
 
-          cat >release-notes.md <<EOF
-          ## dsh-image ${VERSION}
-
-          打包 [@deepseek-ai/dsh](https://www.npmjs.com/package/@deepseek-ai/dsh) **${DSH_VERSION}**。镜像 tag 与 npm 版本相同；同一 tag 可重复推送以覆盖 Digest（需 registry 侧允许）。
-
-          | Pin | Value |
-          | --- | --- |
-          | \`DSH_VERSION\` | \`${DSH_VERSION}\` |
-
-          ### Pull
-
-          \`\`\`bash
-          # Aliyun ACR (Beijing, preferred in China)
-          docker pull ${ACR_IMAGE}:${VERSION}
-
-          # Docker Hub
-          docker pull ${DOCKERHUB_IMAGE}:${VERSION}
-          \`\`\`
-
-          ### Digests
-
-          See attached \`sha256sums.txt\`.
-
-          | Registry | Digest |
-          | --- | --- |
-          | Docker Hub | \`${hub_digest}\` |
-          | Aliyun ACR | \`${acr_digest}\` |
-          EOF
-          sed -i 's/^          //' release-notes.md
-          echo "hub_digest=${hub_digest}" >>"${GITHUB_OUTPUT}"
-          echo "acr_digest=${acr_digest}" >>"${GITHUB_OUTPUT}"
-          cat sha256sums.txt
-          cat release-notes.md
-
-      - name: Create or update GitHub Release
+      - name: Record published image
+        if: >
+          steps.plan.outputs.action != 'none' &&
+          steps.plan.outputs.dry_run != 'true' &&
+          (steps.existing.outputs.found == 'true' || steps.build.outcome == 'success')
         env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.meta.outputs.version }}
-          GIT_TAG: ${{ steps.meta.outputs.git_tag }}
-        run: |
-          set -euo pipefail
-          if gh release view "${GIT_TAG}" >/dev/null 2>&1; then
-            gh release upload "${GIT_TAG}" sha256sums.txt --clobber
-            gh release edit "${GIT_TAG}" --notes-file release-notes.md
-          else
-            gh release create "${GIT_TAG}" \
-              --title "dsh-image ${VERSION}" \
-              --notes-file release-notes.md \
-              sha256sums.txt
-          fi
-          gh release view "${GIT_TAG}" --json url,tagName,assets -q .
+          SYNC_VERSION: ${{ steps.plan.outputs.version }}
+          HUB_DIGEST: ${{ steps.existing.outputs.hub_digest || steps.digests.outputs.hub_digest }}
+          ACR_DIGEST: ${{ steps.existing.outputs.acr_digest || steps.digests.outputs.acr_digest }}
+        run: bash scripts/record-dsh-publish.sh
+
+      - name: Record skipped version
+        if: failure() && steps.build.conclusion == 'failure'
+        env:
+          SYNC_VERSION: ${{ steps.plan.outputs.version }}
+        run: bash scripts/record-dsh-skip.sh "image build failed"
